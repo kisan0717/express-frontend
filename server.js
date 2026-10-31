@@ -6,13 +6,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-
-app.get("/", (req, res) => {
-    res.json({
-        message: "Express frontend is running",
-        status: "success"
-    });
-});
+app.use(express.static("public"));
 
 app.get("/health", (req, res) => {
     res.json({
