@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -22,6 +21,7 @@ pipeline {
             steps {
                 sh '''
                     set -eu
+
                     npm ci
 
                     if node -e "
@@ -41,30 +41,46 @@ pipeline {
                 sh '''
                     set -eu
 
+                    echo "Validating application files..."
+
                     test -f server.js
                     test -f package.json
                     test -f package-lock.json
+                    test -f public/index.html
+
+                    echo "Copying application files to EC2..."
 
                     rsync -r \
-                    --no-perms \
-                    --no-owner \
-                    --no-group \
-                    --exclude='node_modules/' \
-                    --exclude='.git/' \
-                    --exclude='.env' \
-                    ./ "$DEPLOY_DIR/"
-                    
+                        --no-perms \
+                        --no-owner \
+                        --no-group \
+                        --exclude='node_modules/' \
+                        --exclude='.git/' \
+                        --exclude='.env' \
+                        ./ "$DEPLOY_DIR/"
+
                     cd "$DEPLOY_DIR"
+
+                    echo "Installing production dependencies..."
+
                     npm ci --omit=dev
 
-                    pm2 describe express-frontend >/dev/null 2>&1 \
-                        && pm2 restart express-frontend \
-                        || pm2 start server.js --name express-frontend
+                    echo "Restarting Express using Ubuntu PM2..."
 
-                    pm2 save
+                    sudo -u ubuntu /usr/bin/pm2 restart express-frontend
+
+                    echo "Checking Express health..."
 
                     curl --fail --silent --show-error \
-                        http://127.0.0.1:3000/
+                        http://127.0.0.1:3000/health
+
+                    echo "Checking HTML frontend..."
+
+                    curl --fail --silent --show-error \
+                        http://127.0.0.1:3000/ \
+                        | grep -qi '<!DOCTYPE html'
+
+                    echo "Express deployment and HTML verification successful."
                 '''
             }
         }
