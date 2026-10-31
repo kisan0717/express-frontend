@@ -8,7 +8,7 @@ app.use(express.json());
 
 app.get("/", (req, res) => {
     res.json({
-        message: "Express frontend is running",
+        message: "Express frontend is running v2",
         status: "success"
     });
 });
