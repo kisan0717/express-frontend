@@ -45,12 +45,15 @@ pipeline {
                     test -f package.json
                     test -f package-lock.json
 
-                    rsync -av \
-                        --exclude='node_modules/' \
-                        --exclude='.git/' \
-                        --exclude='.env' \
-                        ./ "$DEPLOY_DIR/"
-
+                    rsync -r \
+                    --no-perms \
+                    --no-owner \
+                    --no-group \
+                    --exclude='node_modules/' \
+                    --exclude='.git/' \
+                    --exclude='.env' \
+                    ./ "$DEPLOY_DIR/"
+                    
                     cd "$DEPLOY_DIR"
                     npm ci --omit=dev
 
