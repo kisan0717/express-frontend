@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -11,6 +12,7 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
@@ -22,7 +24,11 @@ pipeline {
                 sh '''
                     set -eu
 
+                    echo "Installing dependencies..."
+
                     npm ci
+
+                    echo "Running Express tests..."
 
                     if node -e "
                         const p = require('./package.json');
@@ -69,10 +75,28 @@ pipeline {
 
                     sudo -u ubuntu /usr/bin/pm2 restart express-frontend
 
-                    echo "Checking Express health..."
+                    echo "Waiting for Express to become healthy..."
 
-                    curl --fail --silent --show-error \
-                        http://127.0.0.1:3000/health
+                    for i in $(seq 1 15); do
+
+                        if curl --fail --silent \
+                            http://127.0.0.1:3000/health >/dev/null; then
+
+                            echo "Express health check passed."
+                            break
+                        fi
+
+                        if [ "$i" -eq 15 ]; then
+                            echo "ERROR: Express failed to start."
+
+                            sudo -u ubuntu /usr/bin/pm2 logs express-frontend --lines 50
+
+                            exit 1
+                        fi
+
+                        echo "Waiting for Express... attempt $i"
+                        sleep 2
+                    done
 
                     echo "Checking HTML frontend..."
 
@@ -80,19 +104,30 @@ pipeline {
                         http://127.0.0.1:3000/ \
                         | grep -qi '<!DOCTYPE html'
 
-                    echo "Express deployment and HTML verification successful."
+                    echo "HTML frontend verified successfully."
+
+                    echo "Checking PM2 status..."
+
+                    sudo -u ubuntu /usr/bin/pm2 list
+
+                    echo "Express deployment completed successfully."
                 '''
             }
         }
     }
 
     post {
+
         success {
-            echo 'Express deployment completed successfully.'
+            echo 'SUCCESS: Express frontend deployed successfully.'
         }
 
         failure {
-            echo 'Express deployment failed. Check Console Output.'
+            echo 'FAILURE: Express deployment failed. Check Console Output.'
+        }
+
+        always {
+            echo 'Express CI/CD pipeline execution completed.'
         }
     }
 }
